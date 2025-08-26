@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canvas: Cuadros rebotando y casa</title>
+  <style>
+    :root {
+      --bg: #cfffd1;
+      --panel: #f7fbff;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+    }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .panel {
+      display: grid;
+      place-items: center;
+      padding: 8px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    canvas {
+      display: block;
+      background: #ffffff;
+      border-radius: 8px;
+      border: 2px solid #e7eef7;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="panel">
+      <canvas id="leftCanvas" width="460" height="360"></canvas>
+    </section>
+
+    <section class="panel">
+      <canvas id="rightCanvas" width="460" height="360"></canvas>
+    </section>
+  </div>
+
+  <script>
+    // ========= configuracion =========
+    const LEFT = document.getElementById('leftCanvas');
+    const LCTX = LEFT.getContext('2d');
+
+    const RIGHT = document.getElementById('rightCanvas');
+    const RCTX = RIGHT.getContext('2d');
+
+    // ========= rebote rebotin =========
+    const SQUARE_SIZE = 50;
+
+    const rand = (min, max) => Math.random() * (max - min) + min;
+
+    function makeSquare(color) {
+      return {
+        x: rand(0, LEFT.width - SQUARE_SIZE),
+        y: rand(0, LEFT.height - SQUARE_SIZE),
+        vx: rand(80, 160) * (Math.random() < 0.5 ? 1 : -1),
+        vy: rand(80, 160) * (Math.random() < 0.5 ? 1 : -1),
+        color,
+      };
+    }
+
+    const movers = [
+      makeSquare('#2ecc71'), // verde
+      makeSquare('#e74c3c')  // rojo
+    ];
+
+    let lastTime = performance.now();
+
+    function step(now) {
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      LCTX.clearRect(0, 0, LEFT.width, LEFT.height);
+
+      for (const s of movers) {
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+
+        if (s.x <= 0) { s.x = 0; s.vx *= -1; }
+        if (s.x + SQUARE_SIZE >= LEFT.width) { s.x = LEFT.width - SQUARE_SIZE; s.vx *= -1; }
+
+        if (s.y <= 0) { s.y = 0; s.vy *= -1; }
+        if (s.y + SQUARE_SIZE >= LEFT.height) { s.y = LEFT.height - SQUARE_SIZE; s.vy *= -1; }
+
+        LCTX.fillStyle = s.color;
+        LCTX.fillRect(s.x, s.y, SQUARE_SIZE, SQUARE_SIZE);
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+
+    // ========= arte =========
+    function drawHouse(ctx) {
+      ctx.clearRect(0, 0, RIGHT.width, RIGHT.height);
+
+      const centerX = RIGHT.width / 2;
+      const baseY = RIGHT.height / 2 + 50;
+
+      // Cuerpo de la casa
+      ctx.fillStyle = '#ffcc66';
+      ctx.fillRect(centerX - 80, baseY - 100, 160, 100);
+
+      // Techo
+      ctx.fillStyle = '#cc3333';
+      ctx.beginPath();
+      ctx.moveTo(centerX - 100, baseY - 100);
+      ctx.lineTo(centerX, baseY - 180);
+      ctx.lineTo(centerX + 100, baseY - 100);
+      ctx.closePath();
+      ctx.fill();
+
+      // Puerta
+      ctx.fillStyle = '#663300';
+      ctx.fillRect(centerX - 20, baseY - 60, 40, 60);
+
+      // Ventanas
+      ctx.fillStyle = '#3399ff';
+      ctx.fillRect(centerX - 65, baseY - 80, 30, 30);
+      ctx.fillRect(centerX + 35, baseY - 80, 30, 30);
+    }
+
+    drawHouse(RCTX);
+  </script>
+</body>
+</html>
