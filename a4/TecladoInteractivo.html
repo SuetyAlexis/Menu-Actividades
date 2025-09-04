@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Canvas con GIF y letras</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column; /* Apilar elementos en columna */
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      margin-bottom: 15px;
+      font-size: 22px;
+      color: rgb(255, 255, 255);
+    }
+    canvas {
+      background: #222;
+      border: 2px solid #fff;
+    }
+    #gifSpace {
+      position: absolute;
+      display: none; /* oculto al inicio */
+      width: 180px;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- Texto arriba del canvas -->
+  <h2>Presiona las teclas: D, F, J, K o ESPACIO</h2>
+
+  <!-- Canvas -->
+  <canvas id="gameCanvas" width="700" height="500"></canvas>
+
+  <!-- GIF encima del canvas -->
+  <img id="gifSpace" src="space.gif" alt="GIF Espacio" />
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const gif = document.getElementById("gifSpace");
+
+    // Imágenes por letra
+    const images = {
+      "d": "d.png",
+      "f": "f.png",
+      "j": "j.png",
+      "k": "k.png"
+    };
+
+    let currentKey = null;
+
+    window.addEventListener("keydown", (e) => {
+      const key = e.key.toLowerCase();
+      if (key === " " || key === "spacebar") {
+        e.preventDefault();
+        currentKey = "space";
+        draw();
+        // Mostrar gif centrado
+        gif.style.display = "block";
+        gif.style.left = (window.innerWidth / 2 - gif.width / 2) + "px";
+        gif.style.top = (window.innerHeight / 2 - gif.height / 2 - 60) + "px";
+      } else if (images[key]) {
+        currentKey = key;
+        gif.style.display = "none"; // ocultar gif si no es espacio
+        draw();
+      }
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (currentKey && currentKey !== "space") {
+        const img = new Image();
+        img.src = images[currentKey];
+        img.onload = () => {
+          // Imagen un poco más arriba
+          ctx.drawImage(img, canvas.width/2 - 80, canvas.height/2 - 120, 160, 160);
+
+          // Texto de la letra con más espacio debajo de la imagen
+          ctx.fillStyle = "white";
+          ctx.font = "72px Arial";
+          ctx.fillText(
+            currentKey.toUpperCase(),
+            canvas.width/2 - ctx.measureText(currentKey.toUpperCase()).width/2,
+            canvas.height/2 + 140
+          );
+        };
+      } else if (currentKey === "space") {
+        // Texto "ESPACIO" debajo del GIF
+        ctx.fillStyle = "white";
+        ctx.font = "64px Arial";
+        ctx.fillText(
+          "ESPACIO",
+          canvas.width/2 - ctx.measureText("ESPACIO").width/2,
+          canvas.height/2 + 160
+        );
+      } else {
+        // Mensaje inicial dentro del canvas
+        ctx.fillStyle = "#999";
+        ctx.font = "24px Arial";
+        const msg = "Presiona una tecla para comenzar";
+        ctx.fillText(msg, (canvas.width - ctx.measureText(msg).width)/2, canvas.height/2);
+      }
+    }
+
+    draw();
+  </script>
+</body>
+</html>
+
