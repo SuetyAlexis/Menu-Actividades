@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canvas: Cuadros rebotando y corazón</title>
+  <style>
+    :root {
+      --bg: #cfe9ff; /* fondo */
+      --panel: #f7fbff;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+    }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .panel {
+      display: grid;
+      place-items: center;
+      padding: 8px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    canvas {
+      display: block;
+      background: #ffffff;
+      border-radius: 8px;
+      border: 2px solid #e7eef7;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="panel">
+      <canvas id="leftCanvas" width="460" height="360"></canvas>
+    </section>
+
+    <section class="panel">
+      <canvas id="rightCanvas" width="460" height="360"></canvas>
+    </section>
+  </div>
+
+  <script>
+    // ========= configuracion =========
+    const LEFT = document.getElementById('leftCanvas');
+    const LCTX = LEFT.getContext('2d');
+
+    const RIGHT = document.getElementById('rightCanvas');
+    const RCTX = RIGHT.getContext('2d');
+
+    // ========= cuadros rebote =========
+    const SQUARE_SIZE = 22;
+    const COUNT_BLUE = 8;
+    const COUNT_PURPLE = 8;
+
+    const rand = (min, max) => Math.random() * (max - min) + min;
+
+    function makeSquare(color) {
+      const padding = 4;
+      const w = LEFT.width, h = LEFT.height;
+      return {
+        x: rand(padding, w - SQUARE_SIZE - padding),
+        y: rand(padding, h - SQUARE_SIZE - padding),
+        vx: rand(80, 160) * (Math.random() < 0.5 ? 1 : -1),
+        vy: rand(80, 160) * (Math.random() < 0.5 ? 1 : -1),
+        color,
+      };
+    }
+
+    const movers = [];
+    for (let i = 0; i < COUNT_BLUE; i++) movers.push(makeSquare('#2b74ff'));
+    for (let i = 0; i < COUNT_PURPLE; i++) movers.push(makeSquare('#7a3cff'));
+
+    let lastTime = performance.now();
+
+    function step(now) {
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      LCTX.clearRect(0, 0, LEFT.width, LEFT.height);
+
+      for (const s of movers) {
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+
+        if (s.x <= 0) { s.x = 0; s.vx *= -1; }
+        if (s.x + SQUARE_SIZE >= LEFT.width) { s.x = LEFT.width - SQUARE_SIZE; s.vx *= -1; }
+
+        if (s.y <= 0) { s.y = 0; s.vy *= -1; }
+        if (s.y + SQUARE_SIZE >= LEFT.height) { s.y = LEFT.height - SQUARE_SIZE; s.vy *= -1; }
+
+        LCTX.fillStyle = s.color;
+        LCTX.fillRect(s.x, s.y, SQUARE_SIZE, SQUARE_SIZE);
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+
+    // ========= arte corazon =========
+    const HEART_PATTERN = [
+      [0,0,1,1,0,0,0,0,0,0,1,1,0,0,0],
+      [0,1,1,1,1,0,0,0,0,1,1,1,1,0,0],
+      [1,1,1,1,1,1,0,0,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,1,1,1,1,1,1,0,0,0],
+      [0,0,0,0,1,1,1,1,1,1,1,0,0,0,0],
+      [0,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+      [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ];
+
+    function drawHeart(ctx, pattern, square = 18, gap = 2, color = '#e8242e') {
+      ctx.clearRect(0, 0, RIGHT.width, RIGHT.height);
+
+      const rows = pattern.length;
+      const cols = pattern[0].length;
+      const cell = square + gap;
+
+      const shapeW = cols * cell - gap;
+      const shapeH = rows * cell - gap;
+
+      const offsetX = Math.floor((RIGHT.width - shapeW) / 2);
+      const offsetY = Math.floor((RIGHT.height - shapeH) / 2);
+
+      ctx.fillStyle = color;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (pattern[r][c] === 1) {
+            const x = offsetX + c * cell;
+            const y = offsetY + r * cell;
+            ctx.fillRect(x, y, square, square);
+          }
+        }
+      }
+    }
+
+    drawHeart(RCTX, HEART_PATTERN);
+  </script>
+</body>
+</html>
