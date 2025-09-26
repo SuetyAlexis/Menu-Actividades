@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Puntos 2D (seno/cos) que se prenden por proximidad</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --panel-w: min(90vw, 980px);
+      --panel-h: min(70vh, 620px);
+    }
+    *{ box-sizing: border-box }
+    html, body{
+      height: 100%;
+      margin: 0;
+      background: #000;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #e5e7eb;
+    }
+    body{
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .panel{
+      width: var(--panel-w);
+      height: var(--panel-h);
+      background: #000; /* fondo negro */
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 18px;
+      box-shadow:
+        0 30px 60px rgba(0,0,0,.75),
+        inset 0 1px 0 rgba(255,255,255,.04);
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+      position: relative;
+    }
+    .header{
+      padding: 12px 16px;
+      font-size: 14px;
+      letter-spacing: .2px;
+      color: #cfe1ff;
+      background: #050505;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      text-align: center;
+      user-select: none;
+    }
+    canvas{
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
+    .panel::after{
+      content:"";
+      position:absolute; inset:0;
+      border-radius: 18px;
+      pointer-events:none;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.03) inset;
+    }
+  </style>
+</head>
+<body>
+  <section class="panel" id="panel">
+    <div class="header">Pasa el mouse para prender los puntos</div>
+    <canvas id="scene" aria-label="escena"></canvas>
+  </section>
+
+  <script>
+  (() => {
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    const panel = document.getElementById('panel');
+
+    // ==========================
+    // Parámetros
+    // ==========================
+    const NUM_PUNTOS = 10; // cantidad de puntos
+    const COLOR_BASES = [
+      {r:147,g:197,b:253}, // azul claro
+      {r:167,g:139,b:250}, // violeta
+      {r:134,g:239,b:172}, // verde
+      {r:251,g:191,b:36},  // ámbar
+      {r:244,g:114,b:182}, // rosa
+    ];
+
+    const state = {
+      w: 0, h: 0,
+      time: 0,
+      mouse: { x: 0, y: 0, inside: false },
+      puntos: [],
+      last: performance.now(),
+      headerH: 0
+    };
+
+    // Utils
+    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+    const lerp  = (a,b,t)=>a + (b-a)*t;
+    const rand  = (min,max)=>Math.random()*(max-min)+min;
+    const choice= arr=>arr[(Math.random()*arr.length)|0];
+
+    // Crea un punto con movimiento 2D (sen/cos)
+    function crearPunto() {
+      const col = choice(COLOR_BASES);
+      const rBase = rand(10,16);
+      // Centro de oscilación en zona segura (20%–80%)
+      const cx = state.w * rand(0.2, 0.8);
+      const cy = state.h * rand(0.25, 0.75);
+
+      return {
+        // Centro
+        cx, cy,
+        // Amplitudes independientes en X y Y
+        Ax: rand(60, state.w*0.25),
+        Ay: rand(40, state.h*0.25),
+        // Frecuencias (rad/s) independientes
+        wx: rand(0.6, 1.4),
+        wy: rand(0.6, 1.4),
+        // Fases iniciales
+        phx: rand(0, Math.PI*2),
+        phy: rand(0, Math.PI*2),
+
+        // Apariencia y proximidad
+        rBase,
+        rMax: rBase + rand(6,12),
+        glowBase: rand(14,22),
+        glowMax: rand(60,90),
+        haloMax: rand(120,200),
+        proximity: rand(160, 240),
+        color: {...col},
+
+        // Posición actual (se calcula en update)
+        x: cx, y: cy
+      };
+    }
+
+    // Redimensionar canvas al panel
+    function resize(){
+      const header = panel.querySelector('.header');
+      state.headerH = header.getBoundingClientRect().height;
+      const r = panel.getBoundingClientRect();
+      canvas.width  = state.w = Math.floor(r.width);
+      canvas.height = state.h = Math.floor(r.height - state.headerH);
+
+      // Re-crear puntos con el nuevo tamaño (mantiene variedad)
+      state.puntos = [];
+      for (let i=0;i<NUM_PUNTOS;i++) state.puntos.push(crearPunto());
+    }
+    addEventListener('resize', resize);
+    requestAnimationFrame(resize);
+
+    // Inputs
+    function setMouse(e){
+      const cr = canvas.getBoundingClientRect();
+      const x = (e.clientX ?? (e.touches?.[0]?.clientX ?? 0)) - cr.left;
+      const y = (e.clientY ?? (e.touches?.[0]?.clientY ?? 0)) - cr.top;
+      state.mouse.x = Math.max(0, Math.min(state.w, x));
+      state.mouse.y = Math.max(0, Math.min(state.h, y));
+      state.mouse.inside = true;
+    }
+    panel.addEventListener('mousemove', setMouse, { passive: true });
+    panel.addEventListener('mouseenter', () => state.mouse.inside = true, { passive: true });
+    panel.addEventListener('mouseleave', () => state.mouse.inside = false, { passive: true });
+    panel.addEventListener('touchstart', setMouse, { passive: true });
+    panel.addEventListener('touchmove', setMouse, { passive: true });
+    panel.addEventListener('touchend', () => state.mouse.inside = false, { passive: true });
+
+    // Actualizar posiciones (movimiento 2D sen/cos)
+    function update(dt){
+      const t = state.time;
+      for (const p of state.puntos){
+        // x = cx + Ax * sin(wx*t + phx)
+        // y = cy + Ay * cos(wy*t + phy)
+        p.x = p.cx + p.Ax * Math.sin(p.wx * t + p.phx);
+        p.y = p.cy + p.Ay * Math.cos(p.wy * t + p.phy);
+      }
+    }
+
+    // Dibujar escena
+    function draw(){
+      // Fondo negro
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0,0,state.w,state.h);
+
+      for (const p of state.puntos){
+        // Proximidad al mouse
+        let t = 0;
+        if (state.mouse.inside){
+          const dx = p.x - state.mouse.x;
+          const dy = p.y - state.mouse.y;
+          const dist = Math.hypot(dx,dy);
+          t = clamp(1 - dist / p.proximity, 0, 1); // 0 lejos -> 1 encima
+        }
+
+        const radius = lerp(p.rBase, p.rMax, t);
+        const glow   = lerp(p.glowBase, p.glowMax, t);
+        const R = Math.round(lerp(p.color.r, 255, t));
+        const G = Math.round(lerp(p.color.g, 255, t));
+        const B = Math.round(lerp(p.color.b, 255, t));
+
+        // Halo aditivo
+        if (t > 0){
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.35 * t;
+          const haloR = lerp(p.haloMax*0.5, p.haloMax, t);
+          const halo = ctx.createRadialGradient(p.x, p.y, radius*0.2, p.x, p.y, haloR);
+          halo.addColorStop(0, `rgba(${R},${G},${B}, .7)`);
+          halo.addColorStop(1, `rgba(${R},${G},${B}, 0)`);
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, haloR, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Cuerpo brillante
+        ctx.save();
+        ctx.shadowColor = `rgba(${R},${G},${B}, 1)`;
+        ctx.shadowBlur = glow;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI*2);
+        ctx.fillStyle = `rgb(${R},${G},${B})`;
+        ctx.fill();
+
+        // Núcleo
+        const core = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius*0.7);
+        core.addColorStop(0, 'rgba(255,255,255,.9)');
+        core.addColorStop(1, `rgba(${R},${G},${B},0)`);
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius*0.95, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Loop
+    function loop(now){
+      const dt = Math.min((now - state.last) / 1000, 0.033);
+      state.last = now;
+      state.time += dt;
+
+      update(dt);
+      draw();
+
+      requestAnimationFrame(loop);
+    }
+
+    // Iniciar cuando el canvas tenga tamaño
+    const startWhenReady = () => {
+      if (canvas.width === 0 || canvas.height === 0){
+        requestAnimationFrame(startWhenReady);
+      } else {
+        requestAnimationFrame(loop);
+      }
+    };
+    startWhenReady();
+  })();
+  </script>
+</body>
+</html>
