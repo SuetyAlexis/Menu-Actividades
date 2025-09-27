@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>CD Girando con Música</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --case-w: 700px;       /* Ancho de la caja */
+      --case-h: 700px;       /* Alto de la caja */
+      --cd-size: 470px;      /* Tamaño del CD */
+      --cd-offset-x: 30px;    /* Mover CD derecha/izquierda */
+      --cd-offset-y: 0px;    /* Mover CD arriba/abajo */
+      --angle: 0deg;         /* Lo actualiza el JS */
+    }
+
+    .cd-wrapper {
+      position: relative;
+      width: var(--case-w);
+      height: var(--case-h);
+      margin: 24px auto;
+      user-select: none;
+      -webkit-user-drag: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .cd-wrapper .case {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .cd-wrapper .disc {
+      position: absolute;
+      width: var(--cd-size);
+      height: var(--cd-size);
+      left: calc(50% + var(--cd-offset-x));
+      top:  calc(50% + var(--cd-offset-y));
+      transform: translate(-50%, -50%) rotate(var(--angle));
+      transform-origin: 50% 50%;
+      pointer-events: none;
+      object-fit: cover;
+      transition: transform 16ms linear;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,.3));
+    }
+
+    .interaction-layer {
+      position: absolute;
+      inset: 0;
+      cursor: grab;
+      background: rgba(0,0,0,0);
+    }
+
+    .interaction-layer:active {
+      cursor: grabbing;
+    }
+
+    .hint {
+      text-align: center;
+      font: 500 14px/1.4 system-ui, sans-serif;
+      margin-top: 8px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cd-wrapper" id="cd">
+    
+    <img class="case" src="Caja.png" alt="Caja del CD" />
+    <img class="disc" src="MGSdisc.png" alt="CD girando" />
+    <div class="interaction-layer" id="layer"></div>
+  </div>
+
+  <p class="hint">Mueve el mouse sobre la caja para girar el CD </p>
+
+  
+  <audio autoplay loop>
+    <source src="01 - Metal Gear Solid Main Theme.mp3" type="audio/mpeg">
+    Tu navegador no soporta audio.
+  </audio>
+
+  <script>
+    (function () {
+      const wrapper = document.getElementById('cd');
+      const layer   = document.getElementById('layer');
+
+      const speed = 0.6; // velocidad de giro
+
+      let angleDeg = 0;
+      let rafId = null;
+      let lastX = null;
+      let isPointerDown = false;
+
+      function setAngle(nextDeg) {
+        angleDeg = nextDeg;
+        wrapper.style.setProperty('--angle', angleDeg + 'deg');
+      }
+
+      layer.addEventListener('pointerdown', (e) => {
+        isPointerDown = true;
+        lastX = e.clientX;
+        layer.setPointerCapture(e.pointerId);
+      });
+
+      layer.addEventListener('pointerup', (e) => {
+        isPointerDown = false;
+        lastX = null;
+        layer.releasePointerCapture(e.pointerId);
+      });
+
+      layer.addEventListener('pointercancel', () => {
+        isPointerDown = false;
+        lastX = null;
+      });
+
+      layer.addEventListener('pointermove', (e) => {
+        if (!isPointerDown) return;
+        const dx = (typeof e.movementX === 'number' ? e.movementX : (lastX != null ? e.clientX - lastX : 0));
+        lastX = e.clientX;
+        if (dx === 0) return;
+
+        const deltaDeg = dx * speed;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          setAngle(angleDeg + deltaDeg);
+        });
+      });
+
+      layer.addEventListener('mousemove', (e) => {
+        if (isPointerDown) return;
+        const rect = wrapper.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const dx = e.clientX - centerX;
+        const deltaDeg = (dx / rect.width) * 2;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          setAngle(angleDeg + deltaDeg);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
