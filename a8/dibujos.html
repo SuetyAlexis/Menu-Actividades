@@ -1,0 +1,204 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arte digital - Actividad Canvas</title>
+  <style>
+    :root{ --bg:#1a0b20; --ink:#e5e7eb; }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      display:grid; place-items:center; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;
+    }
+    .wrap{ display:grid; gap:12px; width:min(980px, 92vw); }
+    h1{ text-align:center; margin:0; padding:10px 0 2px; font-size:clamp(22px, 4vw, 34px); letter-spacing:.3px }
+    .toolbar{ display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:8px }
+    button{ padding:8px 12px; border-radius:10px; border:1px solid #253043; background:#0f1a2b; color:var(--ink); cursor:pointer }
+    button:hover{ background:#13233d }
+    canvas{ display:block; width:100%; height:auto; border:1px solid #1f2937; background:#0a0f1d; border-radius:0 }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Arte digital</h1>
+    <div class="toolbar">
+      <button id="btnRedibujar">Redibujar</button>
+      <button id="btnLimpiar">Limpiar</button>
+    </div>
+    <canvas id="lienzo" width="900" height="620"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('lienzo');
+    const ctx = canvas.getContext('2d');
+
+    function colorToRGB(c){
+      let n = (typeof c === 'string') ? parseInt(c.replace('#',''),16) : c;
+      const r = (n >> 16) & 0xFF, g = (n >> 8) & 0xFF, b = n & 0xFF;
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function limpiar(){ ctx.clearRect(0,0,canvas.width,canvas.height); }
+    function rng(seed){ let s = seed >>> 0; return function(){ s = (s*1664525 + 1013904223) >>> 0; return s/4294967296; } }
+
+    function dibujarCieloYSuelo(){
+      const sky = ctx.createLinearGradient(0,0,0,canvas.height*0.7);
+      sky.addColorStop(0, '#0a0f1d');
+      sky.addColorStop(1, '#102047');
+      ctx.fillStyle = sky; ctx.fillRect(0,0,canvas.width,canvas.height*0.7);
+
+      const groundY = canvas.height*0.7;
+      const grd = ctx.createLinearGradient(0,groundY,0,canvas.height);
+      grd.addColorStop(0, '#14532d'); grd.addColorStop(1, '#166534');
+      ctx.fillStyle = grd; ctx.fillRect(0,groundY, canvas.width, canvas.height-groundY);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0, groundY-2, canvas.width, 4);
+    }
+
+    function dibujarLuna(x,y,r=46){
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle = colorToRGB(0x93c5fd); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+18,y,r,0,Math.PI*2); ctx.fillStyle = '#0a0f1d'; ctx.fill();
+      ctx.restore();
+    }
+
+    function dibujarCasita(x,y,esc=1.6){
+      ctx.save(); ctx.translate(x,y); ctx.scale(esc,esc);
+      ctx.fillStyle = colorToRGB(0x1f6feb); ctx.strokeStyle = colorToRGB(0x1e40af); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.rect(-60,-50,120,90); ctx.fill(); ctx.stroke();
+
+      ctx.beginPath(); ctx.moveTo(-70,-50); ctx.lineTo(0,-100); ctx.lineTo(70,-50); ctx.closePath();
+      ctx.fillStyle = colorToRGB(0xf59e0b); ctx.strokeStyle = colorToRGB(0xb45309); ctx.fill(); ctx.stroke();
+
+      ctx.beginPath(); ctx.rect(-14, -12, 28, 54); ctx.fillStyle = colorToRGB(0x0ea5e9); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(8,14,2.5,0,Math.PI*2); ctx.fillStyle = colorToRGB(0xf59e0b); ctx.fill();
+
+      ctx.beginPath(); ctx.rect(-45,-18, 22, 22); ctx.fillStyle = colorToRGB(0xfacc15); ctx.fill(); ctx.strokeStyle = colorToRGB(0xb45309); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-45+11,-18); ctx.lineTo(-45+11, -18+22); ctx.moveTo(-45, -18+11); ctx.lineTo(-45+22, -18+11); ctx.strokeStyle = colorToRGB(0x78350f); ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.restore();
+    }
+
+    function dibujarHonguito(x,y,esc=0.6,colorSombrero1=0xff6b6b,colorSombrero2=0xc026d3){
+      ctx.save(); ctx.translate(x,y); ctx.scale(esc,esc);
+      const grad = ctx.createRadialGradient(0,-16,10, 0,-18,64);
+      grad.addColorStop(0, colorToRGB(colorSombrero1)); grad.addColorStop(1, colorToRGB(colorSombrero2));
+      ctx.fillStyle = grad; ctx.strokeStyle = colorToRGB(0xf472b6); ctx.lineWidth = 2.0;
+      ctx.beginPath(); ctx.moveTo(-60,0); ctx.quadraticCurveTo(0,-70, 60,0); ctx.quadraticCurveTo(40,10, -40,10); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+      ctx.beginPath(); const w=36,h=52,r=10; const x0=-w/2,y0=10;
+      ctx.moveTo(x0+r,y0); ctx.lineTo(x0+w-r,y0); ctx.quadraticCurveTo(x0+w,y0, x0+w,y0+r);
+      ctx.lineTo(x0+w,y0+h-r); ctx.quadraticCurveTo(x0+w,y0+h, x0+w-r,y0+h);
+      ctx.lineTo(x0+r,y0+h); ctx.quadraticCurveTo(x0,y0+h, x0,y0+h-r);
+      ctx.lineTo(x0,y0+r); ctx.quadraticCurveTo(x0,y0, x0+r,y0);
+      ctx.fillStyle = colorToRGB(0xf1f5f9); ctx.fill(); ctx.strokeStyle = colorToRGB(0x374151); ctx.stroke();
+
+      const spots=[[-8,-16,10],[18,-10,8],[-28,-6,7]];
+      spots.forEach(([sx,sy,rr])=>{ ctx.beginPath(); ctx.arc(sx,sy,rr,0,Math.PI*2); ctx.fillStyle='#ffffff'; ctx.fill(); ctx.strokeStyle=colorToRGB(0xfdf2f8); ctx.stroke(); });
+      ctx.restore();
+    }
+
+    function dibujarEstrella(cx,cy,rExt=6,rInt=3,puntas=5){
+      ctx.save(); ctx.beginPath();
+      for(let i=0;i<puntas*2;i++){
+        const r = (i%2===0)? rExt : rInt;
+        const a = -Math.PI/2 + i * Math.PI / puntas;
+        const x = cx + r*Math.cos(a), y = cy + r*Math.sin(a);
+        (i===0)? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.closePath(); ctx.fillStyle = '#fff8e1'; ctx.fill(); ctx.restore();
+    }
+
+    // VersiÃ³n simple del hada Leaf
+    function dibujarAdaLeaf(x,y){
+      ctx.save();
+      ctx.translate(x,y);
+      // cuerpo verde triangular
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath(); ctx.moveTo(-10,0); ctx.lineTo(10,0); ctx.lineTo(0,25); ctx.closePath(); ctx.fill();
+      // cabeza
+      ctx.fillStyle = '#f9fafb';
+      ctx.beginPath(); ctx.arc(0,-15,10,0,Math.PI*2); ctx.fill();
+      // pelo verde
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath(); ctx.arc(0,-15,10,0,Math.PI*2); ctx.fill();
+      // ojos
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(-4,-15,2,0,Math.PI*2); ctx.arc(4,-15,2,0,Math.PI*2); ctx.fill();
+      // alas claras
+      ctx.fillStyle = 'rgba(134,239,172,0.4)';
+      ctx.beginPath(); ctx.ellipse(-12,-10,16,8,Math.PI/4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(12,-10,16,8,-Math.PI/4,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    function sembrarEstrellas(count=20, seed=4321){
+      const rnd = rng(seed);
+      const skyH = canvas.height*0.68;
+      const casaX = canvas.width/2;
+      const casaY = canvas.height*0.7 - 60;
+      const casaW = 200, casaH = 160;
+      for(let i=0;i<count;i++){
+        const x = Math.floor(rnd()*(canvas.width-40))+20;
+        const y = Math.floor(rnd()*(skyH-20))+10;
+        if(x > casaX-casaW/2 && x < casaX+casaW/2 && y > casaY-casaH && y < casaY+20){
+          continue;
+        }
+        if(i%3===0){ dibujarEstrella(x,y, 8,4,5); }
+        else {
+          const r = rnd()*3 + 1.5;
+          ctx.beginPath(); ctx.arc(x,y, r, 0, Math.PI*2); ctx.fillStyle = '#ffffff'; ctx.fill();
+        }
+      }
+    }
+
+    function plantarHongos(n=12, seed=2026){
+      const rnd = rng(seed);
+      const groundY = canvas.height*0.7;
+      const minY = groundY + 5;
+      const maxY = canvas.height - 10;
+      const positions = [];
+      for(let i=0;i<n;i++){
+        let x,y,ok;
+        let attempts = 0;
+        do {
+          ok = true;
+          x = 40 + rnd()*(canvas.width-80);
+          y = minY + rnd()*(maxY-minY);
+          const esc = 0.5 + rnd()*0.3;
+          const colores = [0xff6b6b,0xf87171,0xfbbf24,0x22c55e,0x3b82f6,0xa855f7];
+          const c1 = colores[Math.floor(rnd()*colores.length)];
+          const c2 = colores[Math.floor(rnd()*colores.length)];
+          if(x > canvas.width/2 - 100 && x < canvas.width/2 + 100) ok=false;
+          for(const p of positions){
+            const dx = x-p.x, dy=y-p.y;
+            if(Math.sqrt(dx*dx+dy*dy) < 45){ ok=false; break; }
+          }
+          attempts++;
+          if(ok){
+            positions.push({x,y});
+            dibujarHonguito(x,y,esc,c1,c2);
+          }
+        } while(!ok && attempts<50);
+      }
+    }
+
+    function dibujarEscena(){
+      limpiar();
+      dibujarCieloYSuelo();
+      dibujarLuna(80,80,46);
+      const groundY = canvas.height*0.7;
+      dibujarCasita(canvas.width/2, groundY-60, 1.6);
+      plantarHongos(14, 9876);
+      sembrarEstrellas(20, 4321);
+      dibujarAdaLeaf(120, groundY-40);
+    }
+
+    document.getElementById('btnRedibujar').addEventListener('click', dibujarEscena);
+    document.getElementById('btnLimpiar').addEventListener('click', limpiar);
+
+    dibujarEscena();
+  </script>
+</body>
+</html>
+
