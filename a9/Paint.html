@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paint Casero en HTML</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --muted:#1f2937;
+      --text:#e5e7eb;
+      --accent:#22c55e;
+      --border:#27272a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .app{max-width:1100px;margin:24px auto;display:grid;gap:12px;padding:12px;text-align:center}
+    h1{font-size:1.8rem;margin:0 0 16px 0;color:var(--accent);}
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;background:var(--panel);padding:12px;border:1px solid var(--border);border-radius:14px}
+    .group{display:flex;gap:8px;align-items:center;justify-content:center;padding:6px 12px;background:var(--muted);border-radius:16px;border:1px solid var(--border)}
+    .swatch{width:28px;height:28px;border-radius:999px;border:2px solid #00000022;cursor:pointer;outline:2px solid transparent;outline-offset:2px}
+    .swatch[aria-checked="true"]{outline-color:var(--accent)}
+    input[type="color"]{appearance:none;border:none;width:40px;height:40px;padding:0;border-radius:999px;cursor:pointer;overflow:hidden}
+    .btn{cursor:pointer;border:none;padding:10px 14px;border-radius:10px;background:#0b1220;color:var(--text);border:1px solid var(--border);font-weight:600}
+    .btn:hover{filter:brightness(1.15)}
+    .btn[aria-pressed="true"]{outline:2px solid var(--accent)}
+    .range{display:flex;gap:8px;align-items:center}
+    .range input{width:220px;-webkit-appearance:none;appearance:none;height:10px;background:var(--muted);border-radius:999px;outline:none;border:1px solid var(--border)}
+    .stage{position:relative;background:#ffffff;border-radius:16px;border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    canvas{width:100%;height:70vh;display:block;border-radius:16px}
+      /* Slider circular */
+    input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:#ffffff; border:2px solid var(--accent); box-shadow:0 1px 3px rgba(0,0,0,.4); position:relative; top:-6px;}
+    input[type=range]::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:#ffffff; border:2px solid var(--accent); box-shadow:0 1px 3px rgba(0,0,0,.4)}
+    input[type=range]::-ms-thumb{ width:22px; height:22px; border-radius:50%; background:#ffffff; border:2px solid var(--accent)}
+    input[type=range]::-webkit-slider-runnable-track{ height:10px; background:#0b1220; border-radius:999px}
+    input[type=range]::-moz-range-track{ height:10px; background:#0b1220; border-radius:999px}
+
+    /* Hacer el color picker perfectamente circular */
+    input[type="color"]::-webkit-color-swatch-wrapper{ padding:0; border-radius:999px }
+    input[type="color"]::-webkit-color-swatch{ border:none; border-radius:999px }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Expresa tu creatividad dibujando</h1>
+    <div class="toolbar" role="toolbar" aria-label="Herramientas de dibujo">
+      <div class="group" aria-label="Colores">
+        <button class="swatch" title="Negro" data-color="#111111" style="background:#111111" aria-checked="true"></button>
+        <button class="swatch" title="Rojo" data-color="#ef4444" style="background:#ef4444"></button>
+        <button class="swatch" title="Verde" data-color="#22c55e" style="background:#22c55e"></button>
+        <button class="swatch" title="Azul" data-color="#3b82f6" style="background:#3b82f6"></button>
+        <button class="swatch" title="Amarillo" data-color="#eab308" style="background:#eab308"></button>
+        <button class="swatch" title="Morado" data-color="#a855f7" style="background:#a855f7"></button>
+        <input id="customColor" type="color" title="Color personalizado" value="#111111" />
+      </div>
+
+      <div class="group range" aria-label="Ajuste fino de grosor" style="border-radius:999px;">
+        <label for="sizeRange">Grosor</label>
+        <input id="sizeRange" type="range" min="1" max="60" value="10" />
+      </div>
+
+      <div class="group" aria-label="Modos">
+        <button id="pencilBtn" class="btn" aria-pressed="true">Lápiz</button>
+        <button id="eraserBtn" class="btn" title="Borrador">Borrador</button>
+      </div>
+
+      <div class="group" aria-label="Acciones">
+        <button id="clearBtn" class="btn" title="Borrar todo">Borrar todo</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <canvas id="canvas" aria-label="Lienzo para dibujar"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let last = null;
+    let color = '#111111';
+    let size = 10;
+    let erasing = false;
+
+    function fitCanvasToContainer() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const prev = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = Math.max(300, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(300, Math.floor(rect.height * dpr));
+      ctx.scale(dpr, dpr);
+      ctx.save();
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+      if (prev.width && prev.height) {
+        const tmp = document.createElement('canvas');
+        tmp.width = prev.width; tmp.height = prev.height;
+        tmp.getContext('2d').putImageData(prev, 0, 0);
+        ctx.drawImage(tmp, 0, 0, rect.width, rect.height);
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(fitCanvasToContainer);
+    resizeObserver.observe(canvas.parentElement);
+    window.addEventListener('load', fitCanvasToContainer);
+
+    function startDraw(x, y) {
+      drawing = true;
+      last = { x, y };
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+
+    function drawTo(x, y) {
+      if (!drawing || !last) return;
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(x, y);
+      ctx.lineWidth = size;
+      if (erasing) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = color;
+      }
+      ctx.stroke();
+      last = { x, y };
+    }
+
+    function endDraw(){ drawing = false; last = null; }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      startDraw(e.clientX - rect.left, e.clientY - rect.top);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawing) return;
+      const rect = canvas.getBoundingClientRect();
+      drawTo(e.clientX - rect.left, e.clientY - rect.top);
+    });
+
+    const end = () => endDraw();
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('pointerleave', end);
+
+    canvas.addEventListener('touchmove', (e)=> e.preventDefault(), { passive:false });
+
+    const swatches = document.querySelectorAll('.swatch');
+    const customColor = document.getElementById('customColor');
+    const sizeRange = document.getElementById('sizeRange');
+    const clearBtn = document.getElementById('clearBtn');
+    const pencilBtn = document.getElementById('pencilBtn');
+    const eraserBtn = document.getElementById('eraserBtn');
+
+    function setColor(newColor){
+      color = newColor; erasing = false;
+      pencilBtn.setAttribute('aria-pressed','true');
+      eraserBtn.setAttribute('aria-pressed','false');
+      swatches.forEach(s=> s.setAttribute('aria-checked', String(s.dataset.color === newColor)));
+      customColor.value = toHex(newColor);
+    }
+
+    function toHex(c){
+      const ctx2 = document.createElement('canvas').getContext('2d');
+      ctx2.fillStyle = c; return ctx2.fillStyle;
+    }
+
+    swatches.forEach(s=>{
+      s.addEventListener('click', ()=> setColor(s.dataset.color));
+    });
+    customColor.addEventListener('input', (e)=> setColor(e.target.value));
+
+    function setSize(px){
+      size = Number(px);
+      sizeRange.value = String(size);
+    }
+
+    sizeRange.addEventListener('input', (e)=> setSize(e.target.value));
+
+    clearBtn.addEventListener('click', ()=>{
+      const rect = canvas.getBoundingClientRect();
+      ctx.save();
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+    });
+
+    pencilBtn.addEventListener('click', ()=>{
+      erasing = false;
+      pencilBtn.setAttribute('aria-pressed','true');
+      eraserBtn.setAttribute('aria-pressed','false');
+    });
+
+    eraserBtn.addEventListener('click', ()=>{
+      erasing = true;
+      pencilBtn.setAttribute('aria-pressed','false');
+      eraserBtn.setAttribute('aria-pressed','true');
+    });
+
+    setColor(color);
+    setSize(10);
+  </script>
+</body>
+</html>
