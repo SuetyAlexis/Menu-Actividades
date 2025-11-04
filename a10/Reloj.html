@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reloj Analógico — Simulación</title>
+  <style>
+    :root{
+      --bg:#1a102b;         /* fondo morado oscuro */
+      --face:#2d1b46;       /* carátula */
+      --ring:#7e22ce;       /* bisel */
+      --tick:#a78bfa;       /* marcas finas */
+      --tick-hr:#d8b4fe;    /* marcas de hora */
+      --num:#f3e8ff;        /* números */
+      --hand-h:#c084fc;     /* horario */
+      --hand-m:#a855f7;     /* minutero */
+      --hand-s:#7e22ce;     /* segundero */
+      --center:#c084fc;     /* punto central */
+      --panel:#201236;      /* panel controles */
+      --panel-ring:#6d28d9; /* borde panel */
+      --btn:#7c3aed;
+      --btn-hover:#6d28d9;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; padding:0;
+      background:var(--bg); color:#ede9fe; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
+      display:flex; min-height:100vh; align-items:center; justify-content:center;
+    }
+    .wrap{display:flex; flex-direction:column; align-items:center; gap:16px; padding:16px}
+    canvas{width:min(90vw,520px); height:auto; background:transparent; border-radius:16px; box-shadow:0 0 0 1px var(--ring) inset}
+    .controls{display:flex; flex-direction:column; gap:14px; width:min(90vw,520px); background:var(--panel); border:1px solid var(--panel-ring); padding:16px; border-radius:14px}
+    .row{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
+    button{appearance:none; border:none; border-radius:12px; padding:10px 14px; background:var(--btn); color:white; font-weight:600; cursor:pointer}
+    button:hover{background:var(--btn-hover)}
+    .slider-row{display:flex; align-items:center; gap:10px; width:100%; justify-content:center}
+    .slider-row label{font-weight:600}
+    input[type="range"]{flex:1}
+    .value{font-variant-numeric:tabular-nums; min-width:60px; text-align:right}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="clock" width="520" height="520" aria-label="Reloj analógico"></canvas>
+
+    <div class="controls">
+      <div class="row">
+        <button id="toggle">Pausar</button>
+        <button id="reset">Reiniciar</button>
+        <button id="now">Hora actual</button>
+      </div>
+      <div class="slider-row">
+        <label for="speed">Velocidad segundero</label>
+        <input id="speed" type="range" min="1" max="240" step="0.1" value="10" />
+        <div class="value" id="speedVal">10.00×</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =================== Parámetros ===================
+    let running = true;
+    let k = 10; // multiplicador de velocidad (1× = reloj real)
+
+    // Velocidades reales (rad/seg)
+    const OMEGA_S = 2 * Math.PI / 60;        // segundero
+    const OMEGA_M = 2 * Math.PI / 3600;      // minutero
+    const OMEGA_H = 2 * Math.PI / (12*3600); // horario
+
+    // Estado angular
+    const angles = { h: 0, m: 0, s: 0 };
+
+    // Canvas
+    const canvas = document.getElementById('clock');
+    const ctx = canvas.getContext('2d');
+
+    // Controles
+    const btnToggle = document.getElementById('toggle');
+    const btnReset = document.getElementById('reset');
+    const btnNow   = document.getElementById('now');
+    const speed    = document.getElementById('speed');
+    const speedVal = document.getElementById('speedVal');
+
+    // =================== Eventos UI ===================
+    speed.addEventListener('input', () => {
+      k = parseFloat(speed.value);
+      speedVal.textContent = k.toFixed(2) + '×';
+    });
+
+    btnToggle.addEventListener('click', () => {
+      running = !running;
+      btnToggle.textContent = running ? 'Pausar' : 'Iniciar';
+    });
+
+    btnReset.addEventListener('click', () => { initAnglesFromNow(); draw(); });
+    btnNow  .addEventListener('click', () => { initAnglesFromNow(); draw(); });
+
+    // =================== Utilidades ===================
+    const TAU = Math.PI*2;
+    const norm = (x) => { x = x % TAU; return x < 0 ? x + TAU : x; };
+
+    function initAnglesFromNow(){
+      const now = new Date();
+      const s = now.getSeconds() + now.getMilliseconds()/1000;
+      const m = now.getMinutes() + s/60;
+      const h = (now.getHours()%12) + m/60;
+      angles.s = TAU * (s/60);
+      angles.m = TAU * (m/60);
+      angles.h = TAU * (h/12);
+    }
+
+    // =================== Dibujo ===================
+    function draw(){
+      const width = canvas.width, height = canvas.height;
+      const cx = width/2, cy = height/2; const radius = Math.min(cx, cy) - 10;
+      ctx.clearRect(0,0,width,height);
+
+      ctx.save(); ctx.translate(cx, cy);
+      // Carátula
+      ctx.beginPath(); ctx.arc(0,0,radius,0,TAU);
+      ctx.fillStyle = getVar('--face'); ctx.fill();
+      ctx.lineWidth = 6; ctx.strokeStyle = getVar('--ring'); ctx.stroke();
+
+      // Marcas
+      for(let i=0;i<60;i++){
+        const a = i * Math.PI / 30; // 2π * i/60
+        const isHour = i % 5 === 0;
+        const len = isHour ? 16 : 8;
+        const w = isHour ? 4 : 2;
+        const r1 = radius - len - 10, r2 = radius - 10;
+        const x1 = r1 * Math.sin(a), y1 = -r1 * Math.cos(a);
+        const x2 = r2 * Math.sin(a), y2 = -r2 * Math.cos(a);
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+        ctx.lineWidth = w;
+        ctx.strokeStyle = isHour ? getVar('--tick-hr') : getVar('--tick');
+        ctx.stroke();
+      }
+
+      // Números 12,3,6,9
+      ctx.fillStyle = getVar('--num');
+      ctx.font = '600 20px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      [12,3,6,9].forEach(lab => {
+        const idx = lab===12?0: lab===3?15: lab===6?30: 45;
+        const a = idx * Math.PI / 30;
+        const r = radius - 40;
+        const x = r * Math.sin(a), y = -r * Math.cos(a);
+        ctx.fillText(String(lab), x, y);
+      });
+
+      // Manecillas
+      drawHand(angles.h, radius*0.5, 8, getVar('--hand-h'));
+      drawHand(angles.m, radius*0.75,5, getVar('--hand-m'));
+      drawHand(angles.s, radius*0.85,2, getVar('--hand-s'));
+
+      // Centro
+      ctx.beginPath(); ctx.arc(0,0,6,0,TAU); ctx.fillStyle = getVar('--center'); ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawHand(angle, length, width, color){
+      ctx.save(); ctx.rotate(angle);
+      ctx.beginPath(); ctx.moveTo(0,8); ctx.lineTo(0,-length);
+      ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.strokeStyle = color; ctx.stroke();
+      ctx.restore();
+    }
+
+    function getVar(name){
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    // =================== Animación ===================
+    let last = null;
+    function loop(ts){
+      if(last==null) last = ts;
+      const dt = Math.min((ts - last)/1000, 0.1); // seg (cap para estabilidad)
+      last = ts;
+
+      if(running){
+        angles.s = norm(angles.s + OMEGA_S * k * dt);
+        angles.m = norm(angles.m + OMEGA_M * k * dt);
+        angles.h = norm(angles.h + OMEGA_H * k * dt);
+      }
+
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // =================== Tests sencillos (console) ===================
+    (function runTests(){
+      const results = [];
+      if (ctx) results.push('✔ Canvas disponible'); else results.push('✖ Canvas no disponible');
+      const sInc = OMEGA_S * k, mInc = OMEGA_M * k, hInc = OMEGA_H * k;
+      const ratioSm = (sInc/mInc).toFixed(4), ratioSh = (sInc/hInc).toFixed(4);
+      results.push(`✔ Razones ω_s/ω_m≈60 (${ratioSm}) y ω_s/ω_h≈720 (${ratioSh})`);
+      console.info('[Clock HTML tests]', results.join(' | '));
+    })();
+
+    // Init
+    initAnglesFromNow();
+    draw();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
+
+
