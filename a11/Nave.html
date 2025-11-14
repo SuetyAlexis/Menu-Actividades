@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nave con Impulso</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      height: 100vh;
+      background-image: url("Galaxia.jpg");
+      background-size: cover;
+      background-position: center;
+      font-family: sans-serif;
+    }
+
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ----- NAVE ----- */
+    #ship {
+      position: absolute;
+      width: 60px; /* Ajusta al tamaño de tu PNG */
+      height: 60px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+    }
+
+    #ship img {
+      width: 100%;
+      height: 100%;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* ----- FUEGO ----- */
+    #fire {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      left: 54%;
+      top: 80%; /* debajo de la nave */
+      transform: translate(-50%, 0);
+      opacity: 0;
+      transition: opacity 0.05s;
+    }
+
+    #fire img {
+      width: 100%;
+      height: 100%;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      text-shadow: 0 0 4px black;
+      user-select: none;
+      pointer-events: none;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game">
+    <div id="ship">
+      <img src="cohete.png" id="ship-img" />
+      <div id="fire"><img src="fuego.png" /></div>
+    </div>
+
+    <div id="hud">← / → o A / D para girar — ESPACIO para impulso</div>
+  </div>
+
+  <script>
+    const ship = document.getElementById("ship");
+    const fire = document.getElementById("fire");
+
+    let posX = window.innerWidth / 2;
+    let posY = window.innerHeight / 2;
+
+    let angle = 0;
+    let velX = 0;
+    let velY = 0;
+
+    const ROTATION_SPEED = 0.08;
+    const ACCELERATION = 0.25;
+    const FRICTION = 0.99;
+
+    const keys = {
+      left: false,
+      right: false,
+      thrust: false
+    };
+
+    // ----- CONTROLES -----
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+      if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+      if (e.code === "Space") {
+        e.preventDefault();
+        keys.thrust = true;
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+      if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+      if (e.code === "Space") keys.thrust = false;
+    });
+
+    // ----- LOOP PRINCIPAL -----
+    function update() {
+      if (keys.left) angle -= ROTATION_SPEED;
+      if (keys.right) angle += ROTATION_SPEED;
+
+      if (keys.thrust) {
+        velX += Math.sin(angle) * ACCELERATION;
+        velY += -Math.cos(angle) * ACCELERATION;
+        fire.style.opacity = 1;
+      } else {
+        fire.style.opacity = 0;
+      }
+
+      posX += velX;
+      posY += velY;
+
+      velX *= FRICTION;
+      velY *= FRICTION;
+
+      const margin = 50;
+      if (posX < -margin) posX = window.innerWidth + margin;
+      if (posX > window.innerWidth + margin) posX = -margin;
+      if (posY < -margin) posY = window.innerHeight + margin;
+      if (posY > window.innerHeight + margin) posY = -margin;
+
+      ship.style.left = posX + "px";
+      ship.style.top = posY + "px";
+      ship.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+
+      requestAnimationFrame(update);
+    }
+
+    update();
+  </script>
+</body>
+</html>
